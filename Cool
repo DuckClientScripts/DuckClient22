@@ -1,191 +1,13 @@
 -- FIFA Super Soccer | v8 — Per-axis hitbox scaling
 -- UI: Rayfield | Ground + Jump hitbox | Auto Dribble | Fast oscillation
 
--- 
--- Key System — Duck Client
--- 
-
-local KEY_FILE = "DuckClient_Key.txt"
-local VERIFY_URL = "https://project-fq58s.vercel.app/api/verify"
-local KEYUI_WEBHOOK = "https://discord.com/api/webhooks/1488200663040004278/ZrSVIt7-bF0w_jr-38326MzlF6Ys9jHfGKeJtgHhUcOEva-9IXkV1iJeCUvB3G21qR7Y"
 local HttpService = game:GetService("HttpService")
 
 local function makeRequest(options)
- local req = http_request or request or (syn and syn.request) or (fluxus and fluxus.request) or (http and http.request)
- if not req then return nil end
- local ok, res = pcall(req, options)
- return ok and res or nil
-end
-
--- Send a simple notification to a webhook
-local function pingWebhook(url, title, desc, color)
- local player = game:GetService("Players").LocalPlayer
- pcall(makeRequest, {
- Url = url,
- Method = "POST",
- Headers = { ["content-type"] = "application/json" },
- Body = HttpService:JSONEncode({
- embeds = {{
- title = title,
- description = desc,
- color = color,
- fields = {
- { name = " Username", value = "```" .. player.Name .. "```", inline = true },
- { name = " User ID", value = "```" .. tostring(player.UserId) .. "```", inline = true },
- { name = "⏰ Time", value = "```" .. os.date("%Y-%m-%d %H:%M:%S") .. "```", inline = false },
- },
- footer = { text = "Duck Client Logger" }
- }}
- })
- })
-end
-
-local function verifyKey(key)
- local res = makeRequest({
- Url = VERIFY_URL .. "?key=" .. key,
- Method = "GET",
- })
- if not res or not res.Body then return false, "Request failed" end
- local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
- if not ok or not data then return false, "Parse failed" end
- return data.success == true, data.message or "Unknown error"
-end
-
--- Check saved key first
-local savedKey = nil
-if isfile(KEY_FILE) then
- savedKey = readfile(KEY_FILE):gsub("%s+", "")
-end
-
-local keyValid = false
-if savedKey and savedKey ~= "" then
- local success, _ = verifyKey(savedKey)
- keyValid = success
-end
-
-if not keyValid then
- -- Notify that someone opened the key UI
- task.spawn(pingWebhook, KEYUI_WEBHOOK, " Key UI Opened", "A player opened the Duck Client key system.", 16753920)
-
- local gui = Instance.new("ScreenGui")
- gui.Name = "DuckKeySystem"
- gui.ResetOnSpawn = false
- gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
- gui.Parent = game:GetService("CoreGui")
-
- local frame = Instance.new("Frame")
- frame.Size = UDim2.new(0, 420, 0, 250)
- frame.Position = UDim2.new(0.5, -210, 0.5, -115)
- frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
- frame.BorderSizePixel = 0
- frame.Parent = gui
- Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-
- local title = Instance.new("TextLabel")
- title.Size = UDim2.new(1, 0, 0, 44)
- title.BackgroundTransparency = 1
- title.Text = " Duck Client — Key System"
- title.TextColor3 = Color3.fromRGB(255, 165, 0)
- title.Font = Enum.Font.GothamBold
- title.TextSize = 17
- title.Parent = frame
-
- local info = Instance.new("TextLabel")
- info.Size = UDim2.new(1, -20, 0, 24)
- info.Position = UDim2.new(0, 10, 0, 50)
- info.BackgroundTransparency = 1
- info.Text = "Get your key at: project-fq58s.vercel.app"
- info.TextColor3 = Color3.fromRGB(200, 200, 200)
- info.Font = Enum.Font.Gotham
- info.TextSize = 13
- info.TextWrapped = true
- info.Parent = frame
-
- local copyLinkBtn = Instance.new("TextButton")
- copyLinkBtn.Size = UDim2.new(1, -20, 0, 30)
- copyLinkBtn.Position = UDim2.new(0, 10, 0, 78)
- copyLinkBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
- copyLinkBtn.Text = " Copy Website Link"
- copyLinkBtn.TextColor3 = Color3.fromRGB(255, 165, 0)
- copyLinkBtn.Font = Enum.Font.GothamBold
- copyLinkBtn.TextSize = 13
- copyLinkBtn.BorderSizePixel = 0
- copyLinkBtn.Parent = frame
- Instance.new("UICorner", copyLinkBtn).CornerRadius = UDim.new(0, 7)
- copyLinkBtn.MouseButton1Click:Connect(function()
- setclipboard("https://work.ink/2p9G/duck-client")
- copyLinkBtn.Text = " Copied!"
- copyLinkBtn.TextColor3 = Color3.fromRGB(0, 220, 120)
- task.wait(2)
- copyLinkBtn.Text = " Copy Website Link"
- copyLinkBtn.TextColor3 = Color3.fromRGB(255, 165, 0)
- end)
-
- local box = Instance.new("TextBox")
- box.Size = UDim2.new(1, -20, 0, 36)
- box.Position = UDim2.new(0, 10, 0, 118)
- box.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
- box.Text = ""
- box.PlaceholderText = "Paste your key here..."
- box.TextColor3 = Color3.fromRGB(255, 255, 255)
- box.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
- box.Font = Enum.Font.Gotham
- box.TextSize = 14
- box.BorderSizePixel = 0
- box.ClearTextOnFocus = false
- box.Parent = frame
- Instance.new("UICorner", box).CornerRadius = UDim.new(0, 7)
-
- local submitBtn = Instance.new("TextButton")
- submitBtn.Size = UDim2.new(1, -20, 0, 36)
- submitBtn.Position = UDim2.new(0, 10, 0, 166)
- submitBtn.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
- submitBtn.Text = "Submit Key"
- submitBtn.TextColor3 = Color3.fromRGB(15, 15, 20)
- submitBtn.Font = Enum.Font.GothamBold
- submitBtn.TextSize = 15
- submitBtn.BorderSizePixel = 0
- submitBtn.Parent = frame
- Instance.new("UICorner", submitBtn).CornerRadius = UDim.new(0, 7)
-
- local status = Instance.new("TextLabel")
- status.Size = UDim2.new(1, -20, 0, 28)
- status.Position = UDim2.new(0, 10, 0, 210)
- status.BackgroundTransparency = 1
- status.Text = ""
- status.TextColor3 = Color3.fromRGB(255, 70, 90)
- status.Font = Enum.Font.Gotham
- status.TextSize = 13
- status.Parent = frame
-
- local submitted = false
- submitBtn.MouseButton1Click:Connect(function()
- local input = box.Text:gsub("%s+", "")
- if input == "" then
- status.Text = " Please enter a key."
- return
- end
- status.TextColor3 = Color3.fromRGB(255, 165, 0)
- status.Text = "⏳ Verifying..."
- submitBtn.Active = false
-
- local success, msg = verifyKey(input)
- if success then
- writefile(KEY_FILE, input)
- keyValid = true
- submitted = true
- status.TextColor3 = Color3.fromRGB(0, 220, 120)
- status.Text = " Key accepted! Loading Duck Client..."
- task.wait(1.5)
- gui:Destroy()
- else
- submitBtn.Active = true
- status.TextColor3 = Color3.fromRGB(255, 70, 90)
- status.Text = " " .. (msg or "Invalid key.")
- end
- end)
-
- repeat task.wait(0.1) until submitted
+    local req = http_request or request or (syn and syn.request) or (fluxus and fluxus.request) or (http and http.request)
+    if not req then return nil end
+    local ok, res = pcall(req, options)
+    return ok and res or nil
 end
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -193,9 +15,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- 
--- !! PASTE YOUR DISCORD WEBHOOK URL BELOW !!
--- 
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1485296894510108683/R7jWQRSX2qzPVA-aiRPo8eNfp9c3IqyKu6DRgJNQM8o3sbHmv0ySD_s4qlaOP4oQP2Bs"
 
 -- 
@@ -1391,4 +1210,3 @@ LocalPlayer.AncestryChanged:Connect(function()
 end)
 
 notify("FIFA Super Soccer","Loaded! v10 — Ground + Jump + Tackle hitboxes.",4)
-
