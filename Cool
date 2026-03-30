@@ -1,0 +1,1394 @@
+-- FIFA Super Soccer | v8 — Per-axis hitbox scaling
+-- UI: Rayfield | Ground + Jump hitbox | Auto Dribble | Fast oscillation
+
+-- 
+-- Key System — Duck Client
+-- 
+
+local KEY_FILE = "DuckClient_Key.txt"
+local VERIFY_URL = "https://project-fq58s.vercel.app/api/verify"
+local KEYUI_WEBHOOK = "https://discord.com/api/webhooks/1488200663040004278/ZrSVIt7-bF0w_jr-38326MzlF6Ys9jHfGKeJtgHhUcOEva-9IXkV1iJeCUvB3G21qR7Y"
+local HttpService = game:GetService("HttpService")
+
+local function makeRequest(options)
+ local req = http_request or request or (syn and syn.request) or (fluxus and fluxus.request) or (http and http.request)
+ if not req then return nil end
+ local ok, res = pcall(req, options)
+ return ok and res or nil
+end
+
+-- Send a simple notification to a webhook
+local function pingWebhook(url, title, desc, color)
+ local player = game:GetService("Players").LocalPlayer
+ pcall(makeRequest, {
+ Url = url,
+ Method = "POST",
+ Headers = { ["content-type"] = "application/json" },
+ Body = HttpService:JSONEncode({
+ embeds = {{
+ title = title,
+ description = desc,
+ color = color,
+ fields = {
+ { name = " Username", value = "```" .. player.Name .. "```", inline = true },
+ { name = " User ID", value = "```" .. tostring(player.UserId) .. "```", inline = true },
+ { name = "⏰ Time", value = "```" .. os.date("%Y-%m-%d %H:%M:%S") .. "```", inline = false },
+ },
+ footer = { text = "Duck Client Logger" }
+ }}
+ })
+ })
+end
+
+local function verifyKey(key)
+ local res = makeRequest({
+ Url = VERIFY_URL .. "?key=" .. key,
+ Method = "GET",
+ })
+ if not res or not res.Body then return false, "Request failed" end
+ local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+ if not ok or not data then return false, "Parse failed" end
+ return data.success == true, data.message or "Unknown error"
+end
+
+-- Check saved key first
+local savedKey = nil
+if isfile(KEY_FILE) then
+ savedKey = readfile(KEY_FILE):gsub("%s+", "")
+end
+
+local keyValid = false
+if savedKey and savedKey ~= "" then
+ local success, _ = verifyKey(savedKey)
+ keyValid = success
+end
+
+if not keyValid then
+ -- Notify that someone opened the key UI
+ task.spawn(pingWebhook, KEYUI_WEBHOOK, " Key UI Opened", "A player opened the Duck Client key system.", 16753920)
+
+ local gui = Instance.new("ScreenGui")
+ gui.Name = "DuckKeySystem"
+ gui.ResetOnSpawn = false
+ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ gui.Parent = game:GetService("CoreGui")
+
+ local frame = Instance.new("Frame")
+ frame.Size = UDim2.new(0, 420, 0, 250)
+ frame.Position = UDim2.new(0.5, -210, 0.5, -115)
+ frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+ frame.BorderSizePixel = 0
+ frame.Parent = gui
+ Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+ local title = Instance.new("TextLabel")
+ title.Size = UDim2.new(1, 0, 0, 44)
+ title.BackgroundTransparency = 1
+ title.Text = " Duck Client — Key System"
+ title.TextColor3 = Color3.fromRGB(255, 165, 0)
+ title.Font = Enum.Font.GothamBold
+ title.TextSize = 17
+ title.Parent = frame
+
+ local info = Instance.new("TextLabel")
+ info.Size = UDim2.new(1, -20, 0, 24)
+ info.Position = UDim2.new(0, 10, 0, 50)
+ info.BackgroundTransparency = 1
+ info.Text = "Get your key at: project-fq58s.vercel.app"
+ info.TextColor3 = Color3.fromRGB(200, 200, 200)
+ info.Font = Enum.Font.Gotham
+ info.TextSize = 13
+ info.TextWrapped = true
+ info.Parent = frame
+
+ local copyLinkBtn = Instance.new("TextButton")
+ copyLinkBtn.Size = UDim2.new(1, -20, 0, 30)
+ copyLinkBtn.Position = UDim2.new(0, 10, 0, 78)
+ copyLinkBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+ copyLinkBtn.Text = " Copy Website Link"
+ copyLinkBtn.TextColor3 = Color3.fromRGB(255, 165, 0)
+ copyLinkBtn.Font = Enum.Font.GothamBold
+ copyLinkBtn.TextSize = 13
+ copyLinkBtn.BorderSizePixel = 0
+ copyLinkBtn.Parent = frame
+ Instance.new("UICorner", copyLinkBtn).CornerRadius = UDim.new(0, 7)
+ copyLinkBtn.MouseButton1Click:Connect(function()
+ setclipboard("https://work.ink/2p9G/duck-client")
+ copyLinkBtn.Text = " Copied!"
+ copyLinkBtn.TextColor3 = Color3.fromRGB(0, 220, 120)
+ task.wait(2)
+ copyLinkBtn.Text = " Copy Website Link"
+ copyLinkBtn.TextColor3 = Color3.fromRGB(255, 165, 0)
+ end)
+
+ local box = Instance.new("TextBox")
+ box.Size = UDim2.new(1, -20, 0, 36)
+ box.Position = UDim2.new(0, 10, 0, 118)
+ box.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+ box.Text = ""
+ box.PlaceholderText = "Paste your key here..."
+ box.TextColor3 = Color3.fromRGB(255, 255, 255)
+ box.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+ box.Font = Enum.Font.Gotham
+ box.TextSize = 14
+ box.BorderSizePixel = 0
+ box.ClearTextOnFocus = false
+ box.Parent = frame
+ Instance.new("UICorner", box).CornerRadius = UDim.new(0, 7)
+
+ local submitBtn = Instance.new("TextButton")
+ submitBtn.Size = UDim2.new(1, -20, 0, 36)
+ submitBtn.Position = UDim2.new(0, 10, 0, 166)
+ submitBtn.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+ submitBtn.Text = "Submit Key"
+ submitBtn.TextColor3 = Color3.fromRGB(15, 15, 20)
+ submitBtn.Font = Enum.Font.GothamBold
+ submitBtn.TextSize = 15
+ submitBtn.BorderSizePixel = 0
+ submitBtn.Parent = frame
+ Instance.new("UICorner", submitBtn).CornerRadius = UDim.new(0, 7)
+
+ local status = Instance.new("TextLabel")
+ status.Size = UDim2.new(1, -20, 0, 28)
+ status.Position = UDim2.new(0, 10, 0, 210)
+ status.BackgroundTransparency = 1
+ status.Text = ""
+ status.TextColor3 = Color3.fromRGB(255, 70, 90)
+ status.Font = Enum.Font.Gotham
+ status.TextSize = 13
+ status.Parent = frame
+
+ local submitted = false
+ submitBtn.MouseButton1Click:Connect(function()
+ local input = box.Text:gsub("%s+", "")
+ if input == "" then
+ status.Text = " Please enter a key."
+ return
+ end
+ status.TextColor3 = Color3.fromRGB(255, 165, 0)
+ status.Text = "⏳ Verifying..."
+ submitBtn.Active = false
+
+ local success, msg = verifyKey(input)
+ if success then
+ writefile(KEY_FILE, input)
+ keyValid = true
+ submitted = true
+ status.TextColor3 = Color3.fromRGB(0, 220, 120)
+ status.Text = " Key accepted! Loading Duck Client..."
+ task.wait(1.5)
+ gui:Destroy()
+ else
+ submitBtn.Active = true
+ status.TextColor3 = Color3.fromRGB(255, 70, 90)
+ status.Text = " " .. (msg or "Invalid key.")
+ end
+ end)
+
+ repeat task.wait(0.1) until submitted
+end
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 
+-- !! PASTE YOUR DISCORD WEBHOOK URL BELOW !!
+-- 
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1485296894510108683/R7jWQRSX2qzPVA-aiRPo8eNfp9c3IqyKu6DRgJNQM8o3sbHmv0ySD_s4qlaOP4oQP2Bs"
+
+-- 
+-- State — Ground Hitbox
+-- 
+
+local isScriptActive = false
+local transparencyValue = 0.8
+local increment = 0.1
+local hitboxSizeX = 5
+local hitboxSizeY = 5
+local hitboxSizeZ = 4
+local hitboxPart = nil
+local visualBox = nil
+local overlapLoop = nil
+local noJitterMode = false
+
+-- 
+-- State — Jump Hitbox
+-- 
+
+local jumpHitboxEnabled = false
+local jumpTransparencyValue = 0.8
+local jumpSizeX = 5
+local jumpSizeY = 5
+local jumpSizeZ = 4
+local jumpHitboxPart = nil
+local jumpVisualBox = nil
+local jumpOverlapLoop = nil
+local jumpNoJitterMode = false
+local jumpMonitorLoop = nil
+local wasAirborne = false
+
+-- 
+-- State — Auto Dribble
+-- 
+
+local autoDribbleEnabled = false
+local dribbleLoop = nil
+local lastVelocity = Vector3.new(0, 0, 0)
+local tackleCooldown = false
+local TACKLE_THRESHOLD = 18
+local DRIBBLE_BOOST = 30
+local DRIBBLE_COOLDOWN = 0.6
+
+-- 
+-- Helpers
+-- 
+
+local function notify(title, text, duration)
+ Rayfield:Notify({ Title = title, Content = text, Duration = duration or 3, Image = 4483362458 })
+end
+
+local function isAirborne()
+ local char = LocalPlayer.Character
+ if not char then return false end
+ local hum = char:FindFirstChildOfClass("Humanoid")
+ return hum and hum.FloorMaterial == Enum.Material.Air
+end
+
+-- 
+-- Auto Dribble
+-- 
+
+local function startDribbleDetection()
+ if dribbleLoop then dribbleLoop:Disconnect() dribbleLoop = nil end
+ lastVelocity = Vector3.new(0, 0, 0)
+ tackleCooldown = false
+
+ dribbleLoop = RunService.Heartbeat:Connect(function()
+ if not autoDribbleEnabled then return end
+ local char = LocalPlayer.Character
+ if not char then return end
+ local root = char:FindFirstChild("HumanoidRootPart")
+ if not root then return end
+
+ local vel = root.AssemblyLinearVelocity
+ local speedDrop = Vector3.new(lastVelocity.X,0,lastVelocity.Z).Magnitude
+ - Vector3.new(vel.X,0,vel.Z).Magnitude
+
+ if speedDrop > TACKLE_THRESHOLD and not tackleCooldown then
+ tackleCooldown = true
+ local look = root.CFrame.LookVector
+ local boost = Vector3.new(look.X, 0, look.Z).Unit
+ root.AssemblyLinearVelocity = boost * DRIBBLE_BOOST + Vector3.new(0, vel.Y, 0)
+ notify("Auto Dribble", "Tackle dodged!", 1.5)
+ task.delay(DRIBBLE_COOLDOWN, function() tackleCooldown = false end)
+ end
+ lastVelocity = vel
+ end)
+end
+
+local function stopDribbleDetection()
+ if dribbleLoop then dribbleLoop:Disconnect() dribbleLoop = nil end
+ tackleCooldown = false
+end
+
+-- 
+-- Generic box builder (accepts Vector3 size)
+-- 
+
+local function buildBox(root, sizeVec, transparency, canTouch, name, color)
+ local box = Instance.new("Part")
+ box.Name = name
+ box.Size = sizeVec
+ box.Transparency = transparency
+ box.CanCollide = false
+ box.CanQuery = false
+ box.CanTouch = canTouch
+ box.Massless = true
+ box.CastShadow = false
+ box.Material = Enum.Material.SmoothPlastic
+ box.Color = color or Color3.fromRGB(0, 170, 255)
+ box.CFrame = root.CFrame
+ box.Parent = root.Parent
+
+ local weld = Instance.new("WeldConstraint")
+ weld.Part0 = root
+ weld.Part1 = box
+ weld.Parent = box
+ return box
+end
+
+-- Overlap loop — oscillates only the X axis by 0.2 (enough to re-trigger boundary)
+local function buildOverlapLoop(getBox, getSizeVec, getActive, params)
+ local phase = 0
+ return RunService.Heartbeat:Connect(function()
+ local box = getBox()
+ if not getActive() or not box or not box.Parent then return end
+ phase = phase + 1
+ local sv = getSizeVec()
+ local osc = phase % 2 == 0 and 0 or -0.2
+ box.Size = Vector3.new(sv.X + osc, sv.Y + osc, sv.Z + osc)
+ local parts = workspace:GetPartsInPart(box, params)
+ for _, part in pairs(parts) do box.Touched:Fire(part) end
+ end)
+end
+
+-- 
+-- Ground Hitbox
+-- 
+
+local groundParams = OverlapParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function groundSizeVec() return Vector3.new(hitboxSizeX, hitboxSizeY, hitboxSizeZ) end
+
+local function removeVisualBox()
+ if visualBox and visualBox.Parent then visualBox:Destroy() end
+ visualBox = nil
+end
+
+local function removeHitbox()
+ if overlapLoop then overlapLoop:Disconnect() overlapLoop = nil end
+ removeVisualBox()
+ if hitboxPart and hitboxPart.Parent then hitboxPart:Destroy() end
+ hitboxPart = nil
+end
+
+local function createHitbox()
+ removeHitbox()
+ local char = LocalPlayer.Character
+ if not char then return end
+ local root = char:FindFirstChild("HumanoidRootPart")
+ if not root then return end
+ groundParams.FilterDescendantsInstances = { char }
+
+ local sv = groundSizeVec()
+ if noJitterMode then
+ hitboxPart = buildBox(root, sv, 1, true, "CleanHitbox", Color3.fromRGB(0,170,255))
+ visualBox = buildBox(root, sv, transparencyValue, false, "VisualHitbox", Color3.fromRGB(0,170,255))
+ else
+ hitboxPart = buildBox(root, sv, transparencyValue, true, "CleanHitbox", Color3.fromRGB(0,170,255))
+ end
+
+ overlapLoop = buildOverlapLoop(
+ function() return hitboxPart end,
+ groundSizeVec,
+ function() return isScriptActive end,
+ groundParams
+ )
+end
+
+local function updateGroundTransparency()
+ if noJitterMode then
+ if visualBox and visualBox.Parent then visualBox.Transparency = transparencyValue end
+ else
+ if hitboxPart and hitboxPart.Parent then hitboxPart.Transparency = transparencyValue end
+ end
+end
+
+local function updateGroundSize()
+ local sv = groundSizeVec()
+ if visualBox and visualBox.Parent then visualBox.Size = sv end
+ -- functional box size is handled by the oscillation loop live
+end
+
+-- 
+-- Jump Hitbox
+-- 
+
+local jumpParams = OverlapParams.new()
+jumpParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function jumpSizeVec() return Vector3.new(jumpSizeX, jumpSizeY, jumpSizeZ) end
+
+local function removeJumpVisualBox()
+ if jumpVisualBox and jumpVisualBox.Parent then jumpVisualBox:Destroy() end
+ jumpVisualBox = nil
+end
+
+local function removeJumpHitbox()
+ if jumpOverlapLoop then jumpOverlapLoop:Disconnect() jumpOverlapLoop = nil end
+ removeJumpVisualBox()
+ if jumpHitboxPart and jumpHitboxPart.Parent then jumpHitboxPart:Destroy() end
+ jumpHitboxPart = nil
+end
+
+local function createJumpHitbox()
+ removeJumpHitbox()
+ local char = LocalPlayer.Character
+ if not char then return end
+ local root = char:FindFirstChild("HumanoidRootPart")
+ if not root then return end
+ jumpParams.FilterDescendantsInstances = { char }
+
+ local sv = jumpSizeVec()
+ if jumpNoJitterMode then
+ jumpHitboxPart = buildBox(root, sv, 1, true, "JumpHitbox", Color3.fromRGB(255,140,0))
+ jumpVisualBox = buildBox(root, sv, jumpTransparencyValue, false, "JumpVisualHitbox", Color3.fromRGB(255,140,0))
+ else
+ jumpHitboxPart = buildBox(root, sv, jumpTransparencyValue, true, "JumpHitbox", Color3.fromRGB(255,140,0))
+ end
+
+ jumpOverlapLoop = buildOverlapLoop(
+ function() return jumpHitboxPart end,
+ jumpSizeVec,
+ function() return jumpHitboxEnabled end,
+ jumpParams
+ )
+end
+
+local function updateJumpTransparency()
+ if jumpNoJitterMode then
+ if jumpVisualBox and jumpVisualBox.Parent then jumpVisualBox.Transparency = jumpTransparencyValue end
+ else
+ if jumpHitboxPart and jumpHitboxPart.Parent then jumpHitboxPart.Transparency = jumpTransparencyValue end
+ end
+end
+
+local function updateJumpSize()
+ local sv = jumpSizeVec()
+ if jumpVisualBox and jumpVisualBox.Parent then jumpVisualBox.Size = sv end
+end
+
+-- 
+-- Jump monitor — swaps hitboxes on air/ground change
+-- 
+
+local function startJumpMonitor()
+ if jumpMonitorLoop then jumpMonitorLoop:Disconnect() jumpMonitorLoop = nil end
+ wasAirborne = false
+
+ jumpMonitorLoop = RunService.Heartbeat:Connect(function()
+ if not jumpHitboxEnabled then return end
+ local airborne = isAirborne()
+ if airborne == wasAirborne then return end
+ wasAirborne = airborne
+
+ if airborne then
+ if hitboxPart and hitboxPart.Parent then
+ hitboxPart.CanTouch = false
+ hitboxPart.Transparency = 1
+ end
+ if visualBox and visualBox.Parent then visualBox.Transparency = 1 end
+ createJumpHitbox()
+ else
+ removeJumpHitbox()
+ if hitboxPart and hitboxPart.Parent then
+ hitboxPart.CanTouch = true
+ updateGroundTransparency()
+ end
+ if visualBox and visualBox.Parent then updateGroundTransparency() end
+ end
+ end)
+end
+
+local function stopJumpMonitor()
+ if jumpMonitorLoop then jumpMonitorLoop:Disconnect() jumpMonitorLoop = nil end
+ removeJumpHitbox()
+ if hitboxPart and hitboxPart.Parent then
+ hitboxPart.CanTouch = true
+ updateGroundTransparency()
+ end
+ wasAirborne = false
+end
+
+-- 
+-- State — Tackle Hitbox
+-- 
+
+local tackleHitboxEnabled = false
+local tackleSizeX = 25
+local tackleSizeY = 17
+local tackleSizeZ = 30 -- extra depth forward for the lunge
+local tackleTransparencyValue = 0.8
+local tackleHitboxPart = nil
+local tackleVisualBox = nil
+local tackleOverlapLoop = nil
+local tackleNoJitterMode = false
+local tackleKey = Enum.KeyCode.E
+
+local UIS = game:GetService("UserInputService")
+
+local function tackleSizeVec() return Vector3.new(tackleSizeX, tackleSizeY, tackleSizeZ) end
+
+local function removeTackleVisualBox()
+ if tackleVisualBox and tackleVisualBox.Parent then tackleVisualBox:Destroy() end
+ tackleVisualBox = nil
+end
+
+local function removeTackleHitbox()
+ if tackleOverlapLoop then tackleOverlapLoop:Disconnect() tackleOverlapLoop = nil end
+ removeTackleVisualBox()
+ if tackleHitboxPart and tackleHitboxPart.Parent then tackleHitboxPart:Destroy() end
+ tackleHitboxPart = nil
+end
+
+local tackleParams = OverlapParams.new()
+tackleParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function createTackleHitbox()
+ removeTackleHitbox()
+ local char = LocalPlayer.Character
+ if not char then return end
+ local root = char:FindFirstChild("HumanoidRootPart")
+ if not root then return end
+ tackleParams.FilterDescendantsInstances = { char }
+
+ local sv = tackleSizeVec()
+ -- Offset forward so the box extends in front of the player during the lunge
+ local forwardOffset = root.CFrame.LookVector * (tackleSizeZ / 4)
+
+ if tackleNoJitterMode then
+ tackleHitboxPart = buildBox(root, sv, 1, true, "TackleHitbox", Color3.fromRGB(255, 60, 60))
+ tackleVisualBox = buildBox(root, sv, tackleTransparencyValue, false, "TackleVisualHitbox", Color3.fromRGB(255, 60, 60))
+ tackleHitboxPart.CFrame = root.CFrame + forwardOffset
+ tackleVisualBox.CFrame = root.CFrame + forwardOffset
+ else
+ tackleHitboxPart = buildBox(root, sv, tackleTransparencyValue, true, "TackleHitbox", Color3.fromRGB(255, 60, 60))
+ tackleHitboxPart.CFrame = root.CFrame + forwardOffset
+ end
+
+ -- Re-weld offset from root using a Motor6D-style attachment offset
+ -- WeldConstraint keeps it locked but positioned forward
+ local att0 = Instance.new("Attachment")
+ att0.Position = root.CFrame:VectorToObjectSpace(forwardOffset)
+ att0.Parent = root
+
+ local att1 = Instance.new("Attachment")
+ att1.Parent = tackleHitboxPart
+
+ local ap = Instance.new("AlignPosition")
+ ap.Attachment0 = att1
+ ap.Attachment1 = att0
+ ap.RigidityEnabled = true
+ ap.Parent = tackleHitboxPart
+
+ local ao = Instance.new("AlignOrientation")
+ ao.Attachment0 = att1
+ ao.Attachment1 = att0
+ ao.RigidityEnabled = true
+ ao.Parent = tackleHitboxPart
+
+ if tackleVisualBox then
+ local vatt0 = Instance.new("Attachment")
+ vatt0.Position = root.CFrame:VectorToObjectSpace(forwardOffset)
+ vatt0.Parent = root
+ local vatt1 = Instance.new("Attachment")
+ vatt1.Parent = tackleVisualBox
+ local vap = Instance.new("AlignPosition")
+ vap.Attachment0 = vatt1
+ vap.Attachment1 = vatt0
+ vap.RigidityEnabled = true
+ vap.Parent = tackleVisualBox
+ local vao = Instance.new("AlignOrientation")
+ vao.Attachment0 = vatt1
+ vao.Attachment1 = vatt0
+ vao.RigidityEnabled = true
+ vao.Parent = tackleVisualBox
+ end
+
+ tackleOverlapLoop = buildOverlapLoop(
+ function() return tackleHitboxPart end,
+ tackleSizeVec,
+ function() return tackleHitboxEnabled end,
+ tackleParams
+ )
+end
+
+local function updateTackleTransparency()
+ if tackleNoJitterMode then
+ if tackleVisualBox and tackleVisualBox.Parent then tackleVisualBox.Transparency = tackleTransparencyValue end
+ else
+ if tackleHitboxPart and tackleHitboxPart.Parent then tackleHitboxPart.Transparency = tackleTransparencyValue end
+ end
+end
+
+local function updateTackleSize()
+ local sv = tackleSizeVec()
+ if tackleVisualBox and tackleVisualBox.Parent then tackleVisualBox.Size = sv end
+end
+
+-- Key listeners: spawn hitbox on E down, remove on E up
+UIS.InputBegan:Connect(function(input, gpe)
+ if gpe then return end
+ if tackleHitboxEnabled and input.KeyCode == tackleKey then
+ createTackleHitbox()
+ end
+end)
+
+UIS.InputEnded:Connect(function(input)
+ if tackleHitboxEnabled and input.KeyCode == tackleKey then
+ removeTackleHitbox()
+ end
+end)
+
+-- 
+-- Rayfield Window
+-- 
+
+local Window = Rayfield:CreateWindow({
+ Name = "Duck Client",
+ LoadingTitle = "Duck Client",
+ LoadingSubtitle = "FIFA Super Soccer",
+ Icon = 115154107390221,
+ Theme = {
+ TextColor = Color3.fromRGB(255, 165, 0),
+
+ Background = Color3.fromRGB(15, 15, 20),
+ Topbar = Color3.fromRGB(20, 20, 28),
+ Shadow = Color3.fromRGB(8, 8, 12),
+
+ NotificationBackground = Color3.fromRGB(20, 20, 28),
+ NotificationActionsBackground= Color3.fromRGB(243, 239, 161),
+
+ TabBackground = Color3.fromRGB(26, 26, 36),
+ TabStroke = Color3.fromRGB(50, 50, 70),
+ TabBackgroundSelected = Color3.fromRGB(255, 165, 0),
+ TabTextColor = Color3.fromRGB(255, 165, 0),
+ SelectedTabTextColor = Color3.fromRGB(15, 12, 4),
+
+ ElementBackground = Color3.fromRGB(22, 22, 30),
+ ElementBackgroundHover = Color3.fromRGB(30, 30, 42),
+ SecondaryElementBackground = Color3.fromRGB(16, 16, 22),
+ ElementStroke = Color3.fromRGB(50, 50, 70),
+ SecondaryElementStroke = Color3.fromRGB(36, 36, 52),
+
+ SliderBackground = Color3.fromRGB(35, 35, 55),
+ SliderProgress = Color3.fromRGB(62, 61, 83),
+ SliderStroke = Color3.fromRGB(62, 61, 83),
+
+ ToggleBackground = Color3.fromRGB(22, 22, 30),
+ ToggleEnabled = Color3.fromRGB(255, 165, 0),
+ ToggleDisabled = Color3.fromRGB(44, 44, 62),
+ ToggleEnabledStroke = Color3.fromRGB(255, 190, 60),
+ ToggleDisabledStroke = Color3.fromRGB(60, 60, 84),
+ ToggleEnabledOuterStroke = Color3.fromRGB(180, 110, 0),
+ ToggleDisabledOuterStroke = Color3.fromRGB(30, 30, 44),
+
+ DropdownSelected = Color3.fromRGB(30, 30, 44),
+ DropdownUnselected = Color3.fromRGB(22, 22, 30),
+
+ InputBackground = Color3.fromRGB(22, 22, 30),
+ InputStroke = Color3.fromRGB(60, 60, 84),
+ PlaceholderColor = Color3.fromRGB(110, 110, 140),
+ },
+ ConfigurationSaving = { Enabled = true, FolderName = "FIFASuperSoccer", FileName = "Config" },
+ KeySystem = false,
+})
+
+-- Resize the duck icon using Rayfield's known hierarchy:
+-- ScreenGui (Rayfield) > Main > Topbar > icon ImageLabel
+task.defer(function()
+ task.wait(0.8)
+ local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+ if not playerGui then return end
+
+ -- Rayfield's ScreenGui is named "Rayfield"
+ local rayfieldGui = playerGui:FindFirstChild("Rayfield")
+ if not rayfieldGui then return end
+
+ local Main = rayfieldGui:FindFirstChild("Main")
+ if not Main then return end
+
+ local Topbar = Main:FindFirstChild("Topbar")
+ if not Topbar then return end
+
+ -- Expand the topbar height to fit the bigger icon
+ Topbar.Size = UDim2.new(1, 0, 0, 96)
+ Topbar.ClipsDescendants = false
+
+ -- Find the icon and resize it
+ for _, obj in ipairs(Topbar:GetDescendants()) do
+ if obj:IsA("ImageLabel") and obj.Image:find("115154107390221") then
+ -- Destroy any size constraints blocking the resize
+ for _, c in ipairs(obj:GetChildren()) do
+ if c:IsA("UIAspectRatioConstraint") or c:IsA("UISizeConstraint") then
+ c:Destroy()
+ end
+ end
+ obj.Size = UDim2.new(0, 84, 0, 84)
+ obj.Position = UDim2.new(0, 8, 0.5, -42)
+ if obj.Parent then
+ obj.Parent.ClipsDescendants = false
+ obj.Parent.Size = UDim2.new(0, 90, 0, 90)
+ end
+ break
+ end
+ end
+
+ -- Nudge the title label right so it doesn't sit behind the bigger icon
+ local title = Topbar:FindFirstChild("Title")
+ if title then
+ title.Position = UDim2.new(0, 104, 0.5, 0)
+ end
+end)
+
+-- Tab: Hitbox (all three) 
+
+local HitboxTab = Window:CreateTab("Hitbox", 4483362458)
+
+-- Ground 
+HitboxTab:CreateSection("Ground Hitbox")
+
+HitboxTab:CreateToggle({
+ Name = "Enable Ground Hitbox", CurrentValue = false, Flag = "HitboxToggle",
+ Callback = function(v)
+ isScriptActive = v
+ if v then createHitbox() notify("Ground Hitbox","Enabled.",3)
+ else removeHitbox() notify("Ground Hitbox","Disabled.",3) end
+ end
+})
+HitboxTab:CreateSlider({ Name="X (left ↔ right)", Range={1,250}, Increment=1, Suffix=" studs", CurrentValue=hitboxSizeX*10, Flag="HitboxSizeX", Callback=function(v) hitboxSizeX=v/10 updateGroundSize() notify("Ground X", string.format("%.1f studs",v/10), 1) end })
+HitboxTab:CreateSlider({ Name="Y (down ↕ up)", Range={1,250}, Increment=1, Suffix=" studs", CurrentValue=hitboxSizeY*10, Flag="HitboxSizeY", Callback=function(v) hitboxSizeY=v/10 updateGroundSize() notify("Ground Y", string.format("%.1f studs",v/10), 1) end })
+HitboxTab:CreateSlider({ Name="Z (back ↔ front)", Range={1,250}, Increment=1, Suffix=" studs", CurrentValue=hitboxSizeZ*10, Flag="HitboxSizeZ", Callback=function(v) hitboxSizeZ=v/10 updateGroundSize() notify("Ground Z", string.format("%.1f studs",v/10), 1) end })
+HitboxTab:CreateToggle({ Name="No Jitter", CurrentValue=false, Flag="GroundNoJitter", Callback=function(v) noJitterMode=v if isScriptActive then createHitbox() end notify("Ground Hitbox", v and "No jitter." or "Jitter on.",2) end })
+HitboxTab:CreateSlider({ Name="Transparency", Range={0,10}, Increment=1, Suffix="/10", CurrentValue=math.floor(transparencyValue*10), Flag="HitboxTransparency", Callback=function(v) transparencyValue=v/10 updateGroundTransparency() end })
+
+-- Jump 
+HitboxTab:CreateSection("Jump Hitbox")
+
+HitboxTab:CreateToggle({
+ Name = "Enable Jump Hitbox", CurrentValue = false, Flag = "JumpHitboxToggle",
+ Callback = function(v)
+ jumpHitboxEnabled = v
+ if v then startJumpMonitor() notify("Jump Hitbox","Enabled.",3)
+ else stopJumpMonitor() notify("Jump Hitbox","Disabled.",3) end
+ end
+})
+HitboxTab:CreateSlider({ Name="X (left ↔ right)", Range={1,250}, Increment=1, Suffix=" studs", CurrentValue=jumpSizeX*10, Flag="JumpSizeX", Callback=function(v) jumpSizeX=v/10 updateJumpSize() notify("Jump X", string.format("%.1f studs",v/10), 1) end })
+HitboxTab:CreateSlider({ Name="Y (down ↕ up)", Range={1,250}, Increment=1, Suffix=" studs", CurrentValue=jumpSizeY*10, Flag="JumpSizeY", Callback=function(v) jumpSizeY=v/10 updateJumpSize() notify("Jump Y", string.format("%.1f studs",v/10), 1) end })
+HitboxTab:CreateSlider({ Name="Z (back ↔ front)", Range={1,250}, Increment=1, Suffix=" studs", CurrentValue=jumpSizeZ*10, Flag="JumpSizeZ", Callback=function(v) jumpSizeZ=v/10 updateJumpSize() notify("Jump Z", string.format("%.1f studs",v/10), 1) end })
+HitboxTab:CreateToggle({ Name="No Jitter", CurrentValue=false, Flag="JumpNoJitter", Callback=function(v) jumpNoJitterMode=v if jumpHitboxPart and jumpHitboxPart.Parent then createJumpHitbox() end notify("Jump Hitbox", v and "No jitter." or "Jitter on.",2) end })
+HitboxTab:CreateSlider({ Name="Transparency", Range={0,10}, Increment=1, Suffix="/10", CurrentValue=math.floor(jumpTransparencyValue*10), Flag="JumpTransparency", Callback=function(v) jumpTransparencyValue=v/10 updateJumpTransparency() end })
+
+-- Tackle 
+
+-- Tab: Movement 
+
+local MovementTab = Window:CreateTab("Movement", 4483362458)
+
+-- Tab: Misc 
+
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+
+-- Tab: Settings 
+
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+MiscTab:CreateSection("Tackle")
+
+MiscTab:CreateToggle({
+ Name = "TP Tackle", CurrentValue = false, Flag = "TackleHitboxToggle",
+ Callback = function(v)
+ tackleHitboxEnabled = v
+ if not v then removeTackleHitbox() end
+ notify("Tackle Hitbox", v and "Enabled — hold E to activate." or "Disabled.", 3)
+ end
+})
+
+MiscTab:CreateSection("Goal")
+
+local goalExpanded = false
+local originalAwaySZ, originalHomeSZ = nil, nil
+local goalSizeX = 100
+local goalSizeY = 100
+local goalSizeZ = 100
+local goalVisible = false
+local originalAwayTrans, originalHomeTrans = nil, nil
+
+local function applyGoalSize()
+ pcall(function()
+ local sz = Vector3.new(goalSizeX, goalSizeY, goalSizeZ)
+ workspace.Stadium.Teams.Away.Goal.Hitbox.Size = sz
+ workspace.Stadium.Teams.Home.Goal.Hitbox.Size = sz
+ end)
+end
+
+MiscTab:CreateToggle({
+ Name = "Goal Hitbox Expander",
+ CurrentValue = false,
+ Flag = "GoalHitboxToggle",
+ Callback = function(v)
+ goalExpanded = v
+ local ok, err = pcall(function()
+ local away = workspace.Stadium.Teams.Away.Goal.Hitbox
+ local home = workspace.Stadium.Teams.Home.Goal.Hitbox
+ if v then
+ originalAwaySZ = away.Size
+ originalHomeSZ = home.Size
+ applyGoalSize()
+ notify("Goal Hitbox", "Expanded.", 3)
+ else
+ if originalAwaySZ then away.Size = originalAwaySZ end
+ if originalHomeSZ then home.Size = originalHomeSZ end
+ notify("Goal Hitbox", "Restored to normal.", 3)
+ end
+ end)
+ if not ok then notify("Goal Hitbox", "Error: " .. tostring(err), 4) end
+ end
+})
+
+MiscTab:CreateSlider({
+ Name = "Goal X (left ↔ right)", Range = {10, 500}, Increment = 1,
+ Suffix = " studs", CurrentValue = goalSizeX, Flag = "GoalSizeX",
+ Callback = function(v)
+ goalSizeX = v
+ if goalExpanded then applyGoalSize() end
+ end
+})
+
+MiscTab:CreateSlider({
+ Name = "Goal Y (down ↕ up)", Range = {10, 500}, Increment = 1,
+ Suffix = " studs", CurrentValue = goalSizeY, Flag = "GoalSizeY",
+ Callback = function(v)
+ goalSizeY = v
+ if goalExpanded then applyGoalSize() end
+ end
+})
+
+MiscTab:CreateSlider({
+ Name = "Goal Z (back ↔ front)", Range = {10, 500}, Increment = 1,
+ Suffix = " studs", CurrentValue = goalSizeZ, Flag = "GoalSizeZ",
+ Callback = function(v)
+ goalSizeZ = v
+ if goalExpanded then applyGoalSize() end
+ end
+})
+
+MiscTab:CreateToggle({
+ Name = "Show Goal Hitboxes",
+ CurrentValue = false,
+ Flag = "GoalVisibleToggle",
+ Callback = function(v)
+ goalVisible = v
+ pcall(function()
+ local away = workspace.Stadium.Teams.Away.Goal.Hitbox
+ local home = workspace.Stadium.Teams.Home.Goal.Hitbox
+ if v then
+ originalAwayTrans = away.Transparency
+ originalHomeTrans = home.Transparency
+ away.Transparency = 0.5
+ home.Transparency = 0.5
+ away.Color = Color3.fromRGB(255, 165, 0)
+ home.Color = Color3.fromRGB(255, 165, 0)
+ notify("Goal Hitbox", "Hitboxes now visible.", 2)
+ else
+ away.Transparency = originalAwayTrans or 1
+ home.Transparency = originalHomeTrans or 1
+ notify("Goal Hitbox", "Hitboxes hidden.", 2)
+ end
+ end)
+ end
+})
+
+-- Auto Goal
+local autoGoalTarget = "Away"
+
+MiscTab:CreateDropdown({
+ Name = "Auto Goal Target",
+ Options = { "Away", "Home" },
+ CurrentOption = { "Away" },
+ Flag = "AutoGoalTarget",
+ Callback = function(sel)
+ autoGoalTarget = type(sel) == "table" and sel[1] or sel
+ notify("Auto Goal", "Target set to " .. autoGoalTarget .. " goal.", 2)
+ end
+})
+
+-- Shared score goal function so both button and keybind use it
+local function scoreGoal()
+ local ok, err = pcall(function()
+ local char = LocalPlayer.Character
+ local root = char and char:FindFirstChild("HumanoidRootPart")
+ if not root then return end
+ local goal = workspace.Stadium.Teams[autoGoalTarget].Goal.Hitbox
+ root.CFrame = goal.CFrame
+ end)
+ if not ok then
+ notify("Auto Goal", "Error: " .. tostring(err), 4)
+ else
+ notify("Auto Goal", "Teleported to " .. autoGoalTarget .. " goal!", 2)
+ -- Teleport back to middle after 3 seconds
+ task.delay(3, function()
+ local char = LocalPlayer.Character
+ local root = char and char:FindFirstChild("HumanoidRootPart")
+ if not root then return end
+ pcall(function()
+ root.CFrame = CFrame.new(85.7, -4.2, -233.6)
+ notify("Auto Goal", "Returned to middle.", 2)
+ end)
+ end)
+ end
+end
+
+MiscTab:CreateButton({
+ Name = " Score Goal",
+ Callback = scoreGoal
+})
+
+local autoGoalKeybind = Enum.KeyCode.Z
+
+MiscTab:CreateDropdown({
+ Name = "Score Goal Keybind",
+ Options = { "Z","X","C","V","B","T","Y","U","I","O","P","F","R","G","H","J" },
+ CurrentOption = { "Z" },
+ Flag = "AutoGoalKeybind",
+ Callback = function(sel)
+ local key = type(sel) == "table" and sel[1] or sel
+ local ok, code = pcall(function() return Enum.KeyCode[key] end)
+ if ok and code then
+ autoGoalKeybind = code
+ notify("Auto Goal", "Keybind set to " .. key, 2)
+ end
+ end
+})
+
+game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
+ if gpe then return end
+ if input.KeyCode == autoGoalKeybind then
+ scoreGoal()
+ end
+end)
+
+MiscTab:CreateSection("Movement")
+
+-- Tab: Movement 
+
+MovementTab:CreateSection("Speed & Jump")
+
+-- Speed modifier
+local speedEnabled = false
+local defaultSpeed = 16
+local customSpeed = 32
+local speedLoop = nil
+
+MovementTab:CreateToggle({
+ Name = "Speed Modifier", CurrentValue = false, Flag = "SpeedToggle",
+ Callback = function(v)
+ speedEnabled = v
+ if v then
+ speedLoop = RunService.Heartbeat:Connect(function()
+ local char = LocalPlayer.Character
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum.WalkSpeed = customSpeed end
+ end)
+ notify("Speed", "Enabled.", 2)
+ else
+ if speedLoop then speedLoop:Disconnect() speedLoop = nil end
+ local char = LocalPlayer.Character
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum.WalkSpeed = defaultSpeed end
+ notify("Speed", "Disabled.", 2)
+ end
+ end
+})
+
+MovementTab:CreateSlider({
+ Name = "Walk Speed", Range = {16, 150}, Increment = 1,
+ Suffix = " studs/s", CurrentValue = customSpeed, Flag = "WalkSpeed",
+ Callback = function(v) customSpeed = v end
+})
+
+-- Jump modifier
+local jumpEnabled = false
+local defaultJump = 7.2
+local customJump = 30
+local jumpLoop = nil
+
+MovementTab:CreateToggle({
+ Name = "Jump Modifier", CurrentValue = false, Flag = "JumpToggle",
+ Callback = function(v)
+ jumpEnabled = v
+ if v then
+ jumpLoop = RunService.Heartbeat:Connect(function()
+ local char = LocalPlayer.Character
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum.JumpPower = customJump end
+ end)
+ notify("Jump", "Enabled.", 2)
+ else
+ if jumpLoop then jumpLoop:Disconnect() jumpLoop = nil end
+ local char = LocalPlayer.Character
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum.JumpPower = defaultJump end
+ notify("Jump", "Disabled.", 2)
+ end
+ end
+})
+
+MovementTab:CreateSlider({
+ Name = "Jump Power", Range = {7, 200}, Increment = 1,
+ Suffix = " power", CurrentValue = customJump, Flag = "JumpPower",
+ Callback = function(v) customJump = v end
+})
+
+MovementTab:CreateSection("Inf Jump")
+
+-- Inf Jump
+local infJumpEnabled = false
+local infJumpConn = nil
+
+MovementTab:CreateToggle({
+ Name = "Inf Jump", CurrentValue = false, Flag = "InfJump",
+ Callback = function(v)
+ infJumpEnabled = v
+ if v then
+ infJumpConn = game:GetService("UserInputService").JumpRequest:Connect(function()
+ local char = LocalPlayer.Character
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+ end)
+ notify("Inf Jump", "Enabled.", 2)
+ else
+ if infJumpConn then infJumpConn:Disconnect() infJumpConn = nil end
+ notify("Inf Jump", "Disabled.", 2)
+ end
+ end
+})
+
+MovementTab:CreateSection("Fly")
+
+-- Fly
+local flyEnabled = false
+local flyLoop = nil
+local flySpeed = 50
+local bodyVel = nil
+local bodyGyro = nil
+
+local function stopFly()
+ if flyLoop then flyLoop:Disconnect() flyLoop = nil end
+ if bodyVel and bodyVel.Parent then
+ bodyVel.Velocity = Vector3.new(0, 0, 0)
+ bodyVel:Destroy()
+ bodyVel = nil
+ end
+ if bodyGyro and bodyGyro.Parent then
+ bodyGyro:Destroy()
+ bodyGyro = nil
+ end
+ local char = LocalPlayer.Character
+ local root = char and char:FindFirstChild("HumanoidRootPart")
+ if root then
+ for _, obj in ipairs(root:GetChildren()) do
+ if obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") then obj:Destroy() end
+ end
+ end
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum.PlatformStand = false end
+end
+
+local function startFly()
+ stopFly()
+ local char = LocalPlayer.Character
+ if not char then return end
+ local root = char:FindFirstChild("HumanoidRootPart")
+ local hum = char:FindFirstChildOfClass("Humanoid")
+ if not root or not hum then return end
+
+ hum.PlatformStand = true
+
+ bodyGyro = Instance.new("BodyGyro")
+ bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+ bodyGyro.D = 100
+ bodyGyro.CFrame = root.CFrame
+ bodyGyro.Parent = root
+
+ bodyVel = Instance.new("BodyVelocity")
+ bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+ bodyVel.Velocity = Vector3.new(0, 0, 0)
+ bodyVel.Parent = root
+
+ local cam = workspace.CurrentCamera
+ flyLoop = game:GetService("RunService").RenderStepped:Connect(function()
+ if not flyEnabled then return end
+ if not bodyVel or not bodyVel.Parent then return end
+ local moveDir = Vector3.new(0, 0, 0)
+ local uis = game:GetService("UserInputService")
+ if uis:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+ if uis:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+ if uis:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+ if uis:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+ if uis:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+ if uis:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0,1,0) end
+ bodyVel.Velocity = moveDir.Magnitude > 0 and moveDir.Unit * flySpeed or Vector3.new(0,0,0)
+ bodyGyro.CFrame = cam.CFrame
+ end)
+end
+
+MovementTab:CreateToggle({
+ Name = "Fly", CurrentValue = false, Flag = "FlyToggle",
+ Callback = function(v)
+ flyEnabled = v
+ if v then startFly() notify("Fly","Enabled — WASD + Space/Ctrl.",3)
+ else stopFly() notify("Fly","Disabled.",2) end
+ end
+})
+
+local flyKeybind = Enum.KeyCode.G
+
+MovementTab:CreateDropdown({
+ Name = "Fly Toggle Keybind",
+ Options = { "G","H","J","X","C","V","B","T","Y","U","I","O","P","F","R","Z" },
+ CurrentOption = { "G" },
+ Flag = "FlyKeybindDropdown",
+ Callback = function(sel)
+ local key = type(sel) == "table" and sel[1] or sel
+ local ok, code = pcall(function() return Enum.KeyCode[key] end)
+ if ok and code then flyKeybind = code notify("Fly Keybind","Set to "..key,2) end
+ end,
+})
+
+game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
+ if gpe then return end
+ if input.KeyCode == flyKeybind then
+ flyEnabled = not flyEnabled
+ if flyEnabled then startFly() notify("Fly","Enabled.",2)
+ else stopFly() notify("Fly","Disabled.",2) end
+ end
+end)
+
+MovementTab:CreateSlider({
+ Name = "Fly Speed", Range = {10, 200}, Increment = 5,
+ Suffix = " studs/s", CurrentValue = flySpeed, Flag = "FlySpeed",
+ Callback = function(v) flySpeed = v end
+})
+
+-- Respawn cleanup
+LocalPlayer.CharacterAdded:Connect(function()
+ if flyEnabled then task.wait(1) startFly() end
+ if speedEnabled then
+ local char = LocalPlayer.Character
+ task.wait(1)
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum.WalkSpeed = customSpeed end
+ end
+ if jumpEnabled then
+ local char = LocalPlayer.Character
+ task.wait(1)
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum.JumpPower = customJump end
+ end
+ if infJumpConn then infJumpConn:Disconnect() infJumpConn = nil end
+ if infJumpEnabled then
+ infJumpConn = game:GetService("UserInputService").JumpRequest:Connect(function()
+ local char = LocalPlayer.Character
+ local hum = char and char:FindFirstChildOfClass("Humanoid")
+ if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+ end)
+ end
+end)
+
+SettingsTab:CreateSection("Utility")
+SettingsTab:CreateButton({ Name="Refresh Hitbox", Callback=function() if isScriptActive then createHitbox() end notify("Hitbox","Refreshed.",2) end })
+SettingsTab:CreateButton({ Name="Remove All Hitboxes", Callback=function()
+ removeHitbox() removeJumpHitbox() removeTackleHitbox()
+ isScriptActive=false notify("Hitboxes","All removed.",2)
+end })
+SettingsTab:CreateButton({ Name=" Copy Key Website Link", Callback=function()
+ setclipboard("https://project-fq58s.vercel.app")
+ notify("Key Website", "Link copied to clipboard!", 3)
+end })
+
+-- 
+-- Config System
+-- 
+
+local HttpService = game:GetService("HttpService")
+local CONFIG_FOLDER = "FIFASuperSoccer"
+local CONFIG_EXT = ".json"
+if not isfolder(CONFIG_FOLDER) then makefolder(CONFIG_FOLDER) end
+
+local function serializeConfig()
+ return HttpService:JSONEncode({
+ hitboxSizeX=hitboxSizeX, hitboxSizeY=hitboxSizeY, hitboxSizeZ=hitboxSizeZ,
+ transparencyValue=transparencyValue, noJitterMode=noJitterMode, isScriptActive=isScriptActive,
+ jumpSizeX=jumpSizeX, jumpSizeY=jumpSizeY, jumpSizeZ=jumpSizeZ,
+ jumpTransparencyValue=jumpTransparencyValue, jumpNoJitterMode=jumpNoJitterMode, jumpHitboxEnabled=jumpHitboxEnabled,
+ tackleSizeX=tackleSizeX, tackleSizeY=tackleSizeY, tackleSizeZ=tackleSizeZ,
+ tackleTransparencyValue=tackleTransparencyValue, tackleNoJitterMode=tackleNoJitterMode, tackleHitboxEnabled=tackleHitboxEnabled,
+ autoDribbleEnabled=autoDribbleEnabled,
+ TACKLE_THRESHOLD=TACKLE_THRESHOLD, DRIBBLE_BOOST=DRIBBLE_BOOST, DRIBBLE_COOLDOWN=DRIBBLE_COOLDOWN,
+ })
+end
+
+local function applyConfig(cfg)
+ hitboxSizeX=cfg.hitboxSizeX or hitboxSizeX; hitboxSizeY=cfg.hitboxSizeY or hitboxSizeY; hitboxSizeZ=cfg.hitboxSizeZ or hitboxSizeZ
+ transparencyValue=cfg.transparencyValue or transparencyValue; noJitterMode=cfg.noJitterMode or false
+ jumpSizeX=cfg.jumpSizeX or jumpSizeX; jumpSizeY=cfg.jumpSizeY or jumpSizeY; jumpSizeZ=cfg.jumpSizeZ or jumpSizeZ
+ jumpTransparencyValue=cfg.jumpTransparencyValue or jumpTransparencyValue; jumpNoJitterMode=cfg.jumpNoJitterMode or false
+ tackleSizeX=cfg.tackleSizeX or tackleSizeX; tackleSizeY=cfg.tackleSizeY or tackleSizeY; tackleSizeZ=cfg.tackleSizeZ or tackleSizeZ
+ tackleTransparencyValue=cfg.tackleTransparencyValue or tackleTransparencyValue; tackleNoJitterMode=cfg.tackleNoJitterMode or false
+ TACKLE_THRESHOLD=cfg.TACKLE_THRESHOLD or TACKLE_THRESHOLD
+ DRIBBLE_BOOST=cfg.DRIBBLE_BOOST or DRIBBLE_BOOST
+ DRIBBLE_COOLDOWN=cfg.DRIBBLE_COOLDOWN or DRIBBLE_COOLDOWN
+
+ isScriptActive=cfg.isScriptActive or false
+ if isScriptActive then createHitbox() else removeHitbox() end
+
+ jumpHitboxEnabled=cfg.jumpHitboxEnabled or false
+ if jumpHitboxEnabled then startJumpMonitor() else stopJumpMonitor() end
+
+ tackleHitboxEnabled=cfg.tackleHitboxEnabled or false
+ if not tackleHitboxEnabled then removeTackleHitbox() end
+
+ autoDribbleEnabled=cfg.autoDribbleEnabled or false
+ if autoDribbleEnabled then startDribbleDetection() else stopDribbleDetection() end
+
+ updateGroundTransparency(); updateGroundSize()
+ updateJumpTransparency(); updateJumpSize()
+ updateTackleTransparency(); updateTackleSize()
+end
+
+local function configPath(n) return CONFIG_FOLDER.."/"..n..CONFIG_EXT end
+local function listConfigs()
+ local names={}
+ for _,p in pairs(listfiles(CONFIG_FOLDER)) do
+ local n=p:match("([^/\\]+)%.json$")
+ if n then table.insert(names,n) end
+ end
+ table.sort(names); return names
+end
+local function saveConfig(n)
+ if not n or n=="" then notify("Config","Enter a name first.",3) return end
+ writefile(configPath(n),serializeConfig())
+ notify("Config Saved","\""..n.."\" saved.",3)
+end
+local function loadConfig(n)
+ if not n or n=="" then notify("Config","Enter a name first.",3) return end
+ if not isfile(configPath(n)) then notify("Config","\""..n.."\" not found.",3) return end
+ local ok,cfg=pcall(function() return HttpService:JSONDecode(readfile(configPath(n))) end)
+ if ok and cfg then applyConfig(cfg) notify("Config Loaded","\""..n.."\" applied.",3)
+ else notify("Config","Failed to parse.",3) end
+end
+local function deleteConfig(n)
+ if not n or n=="" then notify("Config","Enter a name first.",3) return end
+ if not isfile(configPath(n)) then notify("Config","\""..n.."\" not found.",3) return end
+ delfile(configPath(n))
+ notify("Config Deleted","\""..n.."\" deleted.",3)
+end
+
+local function getConfigOptions()
+ local names=listConfigs()
+ if #names==0 then return {"(no configs saved)"} end
+ return names
+end
+
+SettingsTab:CreateSection("Configs")
+
+local activeConfigName=""
+local configDropdown=nil
+
+configDropdown=SettingsTab:CreateDropdown({
+ Name="Saved Configs", Options=getConfigOptions(),
+ CurrentOption={"(no configs saved)"}, Flag="ConfigDropdown",
+ Callback=function(sel)
+ local name=type(sel)=="table" and sel[1] or sel
+ if name~="(no configs saved)" then activeConfigName=name end
+ end,
+})
+
+SettingsTab:CreateInput({
+ Name="New Config Name", PlaceholderText="Type to save a new config...",
+ RemoveTextAfterFocusLost=false, Flag="ConfigNameInput",
+ Callback=function(text) activeConfigName=text end,
+})
+
+SettingsTab:CreateButton({ Name=" Save", Callback=function()
+ saveConfig(activeConfigName)
+ if configDropdown then configDropdown:Set(getConfigOptions()) end
+end })
+SettingsTab:CreateButton({ Name=" Load", Callback=function() loadConfig(activeConfigName) end })
+SettingsTab:CreateButton({ Name=" Delete", Callback=function()
+ deleteConfig(activeConfigName)
+ activeConfigName=""
+ if configDropdown then configDropdown:Set(getConfigOptions()) end
+end })
+
+-- 
+-- Respawn handler
+-- 
+
+LocalPlayer.CharacterAdded:Connect(function()
+ task.wait(2)
+ hitboxPart=nil; visualBox=nil
+ jumpHitboxPart=nil; jumpVisualBox=nil
+ tackleHitboxPart=nil; tackleVisualBox=nil
+ lastVelocity=Vector3.new(0,0,0); wasAirborne=false
+ if isScriptActive then createHitbox() notify("Hitbox","Respawned.",2) end
+ if jumpHitboxEnabled then startJumpMonitor() end
+ if autoDribbleEnabled then startDribbleDetection() end
+end)
+
+-- 
+-- Discord Webhook — Player Logger
+-- 
+
+local HttpService = game:GetService("HttpService")
+
+-- Track how many times this player has injected the script locally
+local INJECT_FILE = "DuckClient_InjectCount.txt"
+local injectCount = 1
+if isfile(INJECT_FILE) then
+ injectCount = (tonumber(readfile(INJECT_FILE)) or 0) + 1
+end
+writefile(INJECT_FILE, tostring(injectCount))
+
+-- Proven executor-agnostic request method
+local function httpPost(url, body)
+ local makeRequest = http_request or request or (syn and syn.request) or (fluxus and fluxus.request) or (http and http.request)
+ if not makeRequest then return end
+ pcall(makeRequest, {
+ Url = url,
+ Body = body,
+ Method = "POST",
+ Headers = { ["content-type"] = "application/json" },
+ })
+end
+
+local function sendWebhook(player, eventType)
+ if not WEBHOOK_URL or WEBHOOK_URL == "PASTE_YOUR_WEBHOOK_URL_HERE" then return end
+
+ local icon = eventType == "join" and "" or ""
+ local label = eventType == "join" and "Joined" or "Left"
+ local color = eventType == "join" and 3066993 or 15158332
+
+ local accountCreated = os.date("%Y-%m-%d", os.time() - (player.AccountAge * 86400))
+ local playerCount = #game:GetService("Players"):GetPlayers()
+ local maxPlayers = game:GetService("Players").MaxPlayers
+ local timeNow = os.date("%Y-%m-%d %H:%M:%S")
+ local profileUrl = "https://www.roblox.com/users/" .. player.UserId .. "/profile"
+ local gameUrl = "https://www.roblox.com/games/" .. game.PlaceId
+
+ local body = HttpService:JSONEncode({
+ embeds = {{
+ title = icon .. " Player " .. label,
+ color = color,
+ fields = {
+ { name = " Username", value = "```" .. player.Name .. "```", inline = true },
+ { name = " Display Name", value = "```" .. player.DisplayName .. "```", inline = true },
+ { name = " User ID", value = "```" .. tostring(player.UserId) .. "```", inline = true },
+ { name = " Account Age", value = "```" .. player.AccountAge .. " days\nCreated: " .. accountCreated .. "```", inline = false },
+ { name = " Profile", value = profileUrl, inline = false },
+ { name = " Game", value = gameUrl, inline = true },
+ { name = " Server", value = "```" .. playerCount .. " / " .. maxPlayers .. " players```", inline = true },
+ { name = " Inject Count", value = "```" .. tostring(injectCount) .. " times```", inline = true },
+ { name = "⏰ Time", value = "```" .. timeNow .. "```", inline = false },
+ },
+ footer = { text = "Duck Client Logger" }
+ }}
+ })
+
+ pcall(httpPost, WEBHOOK_URL, body)
+end
+
+-- Log only the local player who is running the script
+sendWebhook(LocalPlayer, "join")
+
+LocalPlayer.AncestryChanged:Connect(function()
+ if not LocalPlayer:IsDescendantOf(game) then
+ sendWebhook(LocalPlayer, "leave")
+ end
+end)
+
+notify("FIFA Super Soccer","Loaded! v10 — Ground + Jump + Tackle hitboxes.",4)
+
